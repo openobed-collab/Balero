@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Balero — Super Flexible String</title>
+  <title>Balero — 15s Reset</title>
   <style>
     html, body {
       margin: 0;
@@ -73,8 +73,8 @@
   </div>
 
   <div id="footer">
-    Move your mouse — the stick follows you.<br/>
-    Swing the ball and land the hole on the tip of the stick to score!
+    Move your mouse — you grab the <b>bottom</b> of the stick.<br/>
+    Score before <b>15 seconds</b> runs out, or the game resets!
   </div>
 
   <script>
@@ -91,31 +91,41 @@
       size();
 
       // Game state
-      let pivot = { x: W * 0.5, y: H * 0.35 };
-      let prev = { x: pivot.x, y: pivot.y + 160 };
-      let ball = { x: pivot.x, y: pivot.y + 160 };
-      let vx = 0, vy = 0;
-      let L = 160;
-      let G = 1600;
-      let D = 0.985;
-
       const stickLen = 120;
       const ballR = 24;
       const holeR = 10;
       const scoreThreshold = holeR + 6;
       const tipR = 6;
 
+      let grab = { x: W * 0.5, y: H * 0.6 }; // bottom of stick (follows mouse)
+      let tip = { x: grab.x, y: grab.y - stickLen }; // stick tip (scoring point)
+      let prev = { x: tip.x, y: tip.y + 160 };
+      let ball = { x: tip.x, y: tip.y + 160 };
+      let vx = 0, vy = 0;
+      let L = 160;
+      let G = 1600;
+      let D = 0.985;
+
       let score = 0;
       let streak = 0;
       let canScore = true;
 
-      function resetBall() {
-        ball.x = pivot.x;
-        ball.y = pivot.y + L;
+      // 15 second timer
+      let lastScoreTime = performance.now();
+      const resetTimeout = 15000; // ms
+
+      function resetBall(fullReset = false) {
+        ball.x = tip.x;
+        ball.y = tip.y + L;
         prev.x = ball.x;
         prev.y = ball.y;
         vx = 0; vy = 0;
         canScore = true;
+        if (fullReset) {
+          streak = 0;
+          score = 0;
+          updateScoreLabels();
+        }
       }
 
       function updateScoreLabels() {
@@ -123,32 +133,33 @@
         document.getElementById('streakPill').textContent = 'Streak: ' + streak;
       }
 
-      function setPivot(x, y) {
-        pivot.x = x; pivot.y = y;
+      function setGrab(x, y) {
+        grab.x = x;
+        grab.y = y;
+        tip.x = grab.x;
+        tip.y = grab.y - stickLen;
       }
 
       window.addEventListener('pointermove', (e) => {
-        setPivot(e.clientX, e.clientY);
+        setGrab(e.clientX, e.clientY);
       }, { passive: true });
 
       document.getElementById('resetBtn').addEventListener('click', () => {
-        score = 0;
-        streak = 0;
-        updateScoreLabels();
-        resetBall();
+        resetBall(true);
+        lastScoreTime = performance.now();
       });
 
       let last = performance.now();
       function frame(now) {
         const dt = Math.min(0.033, (now - last) / 1000);
         last = now;
-        update(dt);
+        update(dt, now);
         draw();
         requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
 
-      function update(dt) {
+      function update(dt, now) {
         const x = ball.x, y = ball.y;
         vx = (ball.x - prev.x) / dt;
         vy = (ball.y - prev.y) / dt;
@@ -161,12 +172,12 @@
         let ny = ball.y + vy * dt;
 
         // --- SUPER FLEXIBLE STRING ---
-        let dx = nx - pivot.x;
-        let dy = ny - pivot.y;
+        let dx = nx - tip.x;
+        let dy = ny - tip.y;
         let dist = Math.hypot(dx, dy);
 
-        const slack = 120;       // huge slack so ball can come very close to pivot
-        const stiffness = 0.05;  // very soft spring
+        const slack = 120;
+        const stiffness = 0.05;
 
         if (dist > L) {
           const stretch = dist - L;
@@ -186,7 +197,7 @@
         vx = (ball.x - prev.x) / dt;
         vy = (ball.y - prev.y) / dt;
 
-        const pdist = Math.hypot(ball.x - pivot.x, ball.y - pivot.y);
+        const pdist = Math.hypot(ball.x - tip.x, ball.y - tip.y);
         if (pdist < scoreThreshold) {
           if (canScore) {
             score++;
@@ -194,9 +205,16 @@
             canScore = false;
             updateScoreLabels();
             vy -= Math.max(80, 220 - L * 0.5);
+            lastScoreTime = now; // reset timer on score
           }
         } else {
           canScore = true;
+        }
+
+        // check if too much time passed without scoring
+        if (now - lastScoreTime > resetTimeout) {
+          resetBall(true);
+          lastScoreTime = now;
         }
       }
 
@@ -204,40 +222,43 @@
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, W, H);
 
+        // Rope
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#94a3b8';
         ctx.beginPath();
-        ctx.moveTo(pivot.x, pivot.y);
+        ctx.moveTo(tip.x, tip.y);
         ctx.lineTo(ball.x, ball.y);
         ctx.stroke();
 
-        const stickBottomX = pivot.x;
-        const stickBottomY = pivot.y + stickLen;
+        // Stick
         ctx.lineWidth = 8;
         ctx.lineCap = 'round';
         ctx.strokeStyle = '#f5deb3';
         ctx.beginPath();
-        ctx.moveTo(pivot.x, pivot.y);
-        ctx.lineTo(stickBottomX, stickBottomY);
+        ctx.moveTo(tip.x, tip.y);
+        ctx.lineTo(grab.x, grab.y);
         ctx.stroke();
 
+        // Stick tip
         ctx.fillStyle = '#d1d5db';
         ctx.beginPath();
-        ctx.arc(pivot.x, pivot.y, tipR, 0, Math.PI * 2);
+        ctx.arc(tip.x, tip.y, tipR, 0, Math.PI * 2);
         ctx.fill();
 
+        // Ball
         ctx.fillStyle = '#eab308';
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, ballR, 0, Math.PI * 2);
         ctx.fill();
 
+        // Ball hole
         ctx.fillStyle = '#0f172a';
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, holeR, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      resetBall();
+      resetBall(true);
     })();
   </script>
 </body>
