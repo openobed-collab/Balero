@@ -36,14 +36,34 @@
       line-height: 1;
     }
     #ui .score { font-weight: 700; }
+
+    /* High Scores Box */
+    #highScoresBox {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      background: rgba(2, 6, 23, 0.6);
+      border: 1px solid rgba(226,232,240,0.2);
+      border-radius: 14px;
+      padding: 10px 12px;
+      backdrop-filter: blur(6px);
+      user-select: none;
+      min-width: 160px;
+    }
+    #highScoresBox h3 {
+      margin: 0 0 6px 0;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0.9;
+    }
     #topScores {
-      margin-top: 8px;
       font-size: 13px;
       line-height: 1.4;
     }
     #topScores div {
       opacity: 0.85;
     }
+
     #footer {
       position: fixed;
       bottom: 12px;
@@ -73,11 +93,17 @@
 <body>
   <canvas id="game"></canvas>
 
+  <!-- Score + Reset box (Top Left) -->
   <div id="ui">
     <div class="row" style="gap:12px; margin-bottom:8px;">
       <span class="pill score" id="scorePill">Score: 0</span>
       <button id="resetBtn" class="btn">Reset</button>
     </div>
+  </div>
+
+  <!-- High Score box (Top Right) -->
+  <div id="highScoresBox">
+    <h3>High Score</h3>
     <div id="topScores">
       <div>1. —</div>
       <div>2. —</div>
@@ -297,4 +323,3 @@
   </script>
 </body>
 </html>
-
