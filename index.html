@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,8 +25,9 @@
       padding: 10px 12px;
       backdrop-filter: blur(6px);
       user-select: none;
+      min-width: 160px;
     }
-    #ui .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;}
+    #ui .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     #ui .pill {
       padding: 6px 10px;
       background: rgba(30,41,59,0.8);
@@ -35,6 +37,14 @@
       line-height: 1;
     }
     #ui .score { font-weight: 700; }
+    #topScores {
+      margin-top: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    #topScores div {
+      opacity: 0.85;
+    }
     #footer {
       position: fixed;
       bottom: 12px;
@@ -67,8 +77,14 @@
   <div id="ui">
     <div class="row" style="gap:12px; margin-bottom:8px;">
       <span class="pill score" id="scorePill">Score: 0</span>
-      <span class="pill" id="streakPill">Streak: 0</span>
       <button id="resetBtn" class="btn">Reset</button>
+    </div>
+    <div id="topScores">
+      <div>1. —</div>
+      <div>2. —</div>
+      <div>3. —</div>
+      <div>4. —</div>
+      <div>5. —</div>
     </div>
   </div>
 
@@ -97,8 +113,8 @@
       const scoreThreshold = holeR + 6;
       const tipR = 6;
 
-      let grab = { x: W * 0.5, y: H * 0.6 }; // bottom of stick (follows mouse)
-      let tip = { x: grab.x, y: grab.y - stickLen }; // stick tip (scoring point)
+      let grab = { x: W * 0.5, y: H * 0.6 };
+      let tip = { x: grab.x, y: grab.y - stickLen };
       let prev = { x: tip.x, y: tip.y + 160 };
       let ball = { x: tip.x, y: tip.y + 160 };
       let vx = 0, vy = 0;
@@ -107,14 +123,19 @@
       let D = 0.985;
 
       let score = 0;
-      let streak = 0;
       let canScore = true;
+      let glowUntil = 0; // timestamp until hole glows
+
+      let topScores = [0, 0, 0, 0, 0];
 
       // 15 second timer
       let lastScoreTime = performance.now();
-      const resetTimeout = 15000; // ms
+      const resetTimeout = 15000;
 
       function resetBall(fullReset = false) {
+        if (fullReset && score > 0) {
+          updateTopScores(score);
+        }
         ball.x = tip.x;
         ball.y = tip.y + L;
         prev.x = ball.x;
@@ -122,7 +143,6 @@
         vx = 0; vy = 0;
         canScore = true;
         if (fullReset) {
-          streak = 0;
           score = 0;
           updateScoreLabels();
         }
@@ -130,7 +150,20 @@
 
       function updateScoreLabels() {
         document.getElementById('scorePill').textContent = 'Score: ' + score;
-        document.getElementById('streakPill').textContent = 'Streak: ' + streak;
+      }
+
+      function updateTopScores(newScore) {
+        topScores.push(newScore);
+        topScores.sort((a, b) => b - a);
+        topScores = topScores.slice(0, 5);
+        renderTopScores();
+      }
+
+      function renderTopScores() {
+        const container = document.getElementById('topScores');
+        container.innerHTML = topScores
+          .map((s, i) => `<div>${i + 1}. ${s > 0 ? s : '—'}</div>`)
+          .join('');
       }
 
       function setGrab(x, y) {
@@ -154,7 +187,7 @@
         const dt = Math.min(0.033, (now - last) / 1000);
         last = now;
         update(dt, now);
-        draw();
+        draw(now);
         requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
@@ -171,7 +204,7 @@
         let nx = ball.x + vx * dt;
         let ny = ball.y + vy * dt;
 
-        // --- SUPER FLEXIBLE STRING ---
+        // Rope constraint
         let dx = nx - tip.x;
         let dy = ny - tip.y;
         let dist = Math.hypot(dx, dy);
@@ -197,28 +230,29 @@
         vx = (ball.x - prev.x) / dt;
         vy = (ball.y - prev.y) / dt;
 
+        // Scoring
         const pdist = Math.hypot(ball.x - tip.x, ball.y - tip.y);
         if (pdist < scoreThreshold) {
           if (canScore) {
             score++;
-            streak++;
             canScore = false;
+            glowUntil = now + 1000; // glow for 1s
             updateScoreLabels();
             vy -= Math.max(80, 220 - L * 0.5);
-            lastScoreTime = now; // reset timer on score
+            lastScoreTime = now;
           }
         } else {
           canScore = true;
         }
 
-        // check if too much time passed without scoring
+        // timeout reset
         if (now - lastScoreTime > resetTimeout) {
           resetBall(true);
           lastScoreTime = now;
         }
       }
 
-      function draw() {
+      function draw(now) {
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, W, H);
 
@@ -251,13 +285,14 @@
         ctx.arc(ball.x, ball.y, ballR, 0, Math.PI * 2);
         ctx.fill();
 
-        // Ball hole
-        ctx.fillStyle = '#0f172a';
+        // Ball hole (glows white if within glow time)
+        ctx.fillStyle = (now < glowUntil) ? '#ffffff' : '#0f172a';
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, holeR, 0, Math.PI * 2);
         ctx.fill();
       }
 
+      renderTopScores();
       resetBall(true);
     })();
   </script>
